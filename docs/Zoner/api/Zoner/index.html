@@ -3,7 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.7.0">
-<title data-rh="true">Zoner | Zoner Documentation</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://skyriverstudios.dev/docs/Zoner/api/Zoner"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docusaurus_tag" content="default"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docsearch:docusaurus_tag" content="default"><meta data-rh="true" property="og:title" content="Zoner | Zoner Documentation"><meta data-rh="true" name="description" content="Zoner is a singleton which exports a table of functions to publicly interact with the private methods
+<title data-rh="true">Zoner | Zoner Documentation</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://skyriverstudios.dev/docs/Zoner/api/Zoner"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docusaurus_tag" content="default"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docsearch:docusaurus_tag" content="default"><meta data-rh="true" property="og:title" content="Zoner | Zoner Documentation"><meta data-rh="true" name="description" content="**Zoner** is the high-performance zone manager for your experience — a **per-run-context singleton**
+(one on Server, one on Client) that constructs zones, routes zone updates, and scales detection across
+Actors for parallel execution.
+
+**What it is**
+- A **module-as-table facade**: you require it once and call its exported factories
+  (`New`, `NewFromRegion`, `NewZoneFromBox`) instead of instantiating classes yourself.
+- Internally, it owns a private `ZonerFolder` with:
+  - `Holders/` → a pool of **ZonerActor** (parallel) and **ZonerGroup** (serial) holders.
+  - `Groups/`  → group containers whose attributes mirror group properties and zone IDs.
+- A global **Tracker Registry** via `SharedTableRegistry` for lightweight, cross-script tracking.
+
+**How it works**
+- Creating a zone picks a holder type from `ZoneConfig.Execution` (Parallel → Actor, Serial → Group),
+  provisions/loads holders as needed, and balances **capacity** automatically. Each holder’s `Ids`
+  attributes mirror live zone membership, while an internal cache maps identifiers → zone objects for O(1) access.
+- Updates propagate through attribute changes and bindables (`Zone_Update`, `TrackerId_*`) without yielding.
+
+**Detection &amp; Bounds**
+- Build zones from parts/models/folders **or** from **partless boxes** (`CFrame` + `Size`).
+- Tunable `DetectionCoverage`, `DetectionMethod`, `DetectionMode`, `Simulation`, `Bounds`, and `Rate`
+  with smart defaults. When `DetectionMethod.Automatic`, Zoner selects an efficient strategy; complex
+  modes create internal parts only when required.
+
+**VM / Actor model**
+- Each **ZonerActor** runs the engine script for the current run context and processes a slice of zones
+  **in parallel**; capacities **auto-scale** with configured thread limits.
+- The `Groups/` container is designed to be **registered in each VM** (per Actor) so group attributes
+  and zone IDs stay **automatically synchronized** across Zoner Actor VMs, making group properties easy
+  to read anywhere they are required.
+
+**Public surface**
+- `New`, `NewFromRegion`, `NewZoneFromBox` — zone factories returning `Zone` objects.
+- `CreateGroup` — registers a group; its properties and membership are exposed via attributes for all VMs.
+- `RelocateZonerFolder` — safely re-parents the internal folder (server-side).
+- `Enum` — public enums used by configs.
+- `ZONER_COLLISION_GROUP` — collision group name used for internal ZoneParts.
+
+**Lifecycle**
+- Zoner is created at require-time; call the factory functions directly.
+- Zones can be destroyed individually; if this script is removed, Zoner cleans itself up.
 
 Example:
 ```lua
@@ -20,7 +60,7 @@ local ZoneBox: BasePart = workspace.Box
 -- Any of the following can be left blank, you dont even need to use one:
 local ZoneConfig: Zoner.ZoneConfig = {
 	DetectionCoverage = Zoner.Enum.DetectionCoverage.Center;
-	DetectionMethod   = Zoner.Enum.DetectionMethod.Efficient;[]
+	DetectionMethod   = Zoner.Enum.DetectionMethod.Efficient;
 	DetectionMode     = Zoner.Enum.DetectionMode.Point;
 	
 	Simulation = Zoner.Enum.Simulation.PostSimulation;
@@ -50,7 +90,47 @@ local PlayerExited_Connection =
 		print(`{Player.Name} Exited Zone`)
 	end)
 
-```"><meta data-rh="true" property="og:description" content="Zoner is a singleton which exports a table of functions to publicly interact with the private methods
+```"><meta data-rh="true" property="og:description" content="**Zoner** is the high-performance zone manager for your experience — a **per-run-context singleton**
+(one on Server, one on Client) that constructs zones, routes zone updates, and scales detection across
+Actors for parallel execution.
+
+**What it is**
+- A **module-as-table facade**: you require it once and call its exported factories
+  (`New`, `NewFromRegion`, `NewZoneFromBox`) instead of instantiating classes yourself.
+- Internally, it owns a private `ZonerFolder` with:
+  - `Holders/` → a pool of **ZonerActor** (parallel) and **ZonerGroup** (serial) holders.
+  - `Groups/`  → group containers whose attributes mirror group properties and zone IDs.
+- A global **Tracker Registry** via `SharedTableRegistry` for lightweight, cross-script tracking.
+
+**How it works**
+- Creating a zone picks a holder type from `ZoneConfig.Execution` (Parallel → Actor, Serial → Group),
+  provisions/loads holders as needed, and balances **capacity** automatically. Each holder’s `Ids`
+  attributes mirror live zone membership, while an internal cache maps identifiers → zone objects for O(1) access.
+- Updates propagate through attribute changes and bindables (`Zone_Update`, `TrackerId_*`) without yielding.
+
+**Detection &amp; Bounds**
+- Build zones from parts/models/folders **or** from **partless boxes** (`CFrame` + `Size`).
+- Tunable `DetectionCoverage`, `DetectionMethod`, `DetectionMode`, `Simulation`, `Bounds`, and `Rate`
+  with smart defaults. When `DetectionMethod.Automatic`, Zoner selects an efficient strategy; complex
+  modes create internal parts only when required.
+
+**VM / Actor model**
+- Each **ZonerActor** runs the engine script for the current run context and processes a slice of zones
+  **in parallel**; capacities **auto-scale** with configured thread limits.
+- The `Groups/` container is designed to be **registered in each VM** (per Actor) so group attributes
+  and zone IDs stay **automatically synchronized** across Zoner Actor VMs, making group properties easy
+  to read anywhere they are required.
+
+**Public surface**
+- `New`, `NewFromRegion`, `NewZoneFromBox` — zone factories returning `Zone` objects.
+- `CreateGroup` — registers a group; its properties and membership are exposed via attributes for all VMs.
+- `RelocateZonerFolder` — safely re-parents the internal folder (server-side).
+- `Enum` — public enums used by configs.
+- `ZONER_COLLISION_GROUP` — collision group name used for internal ZoneParts.
+
+**Lifecycle**
+- Zoner is created at require-time; call the factory functions directly.
+- Zones can be destroyed individually; if this script is removed, Zoner cleans itself up.
 
 Example:
 ```lua
@@ -67,7 +147,7 @@ local ZoneBox: BasePart = workspace.Box
 -- Any of the following can be left blank, you dont even need to use one:
 local ZoneConfig: Zoner.ZoneConfig = {
 	DetectionCoverage = Zoner.Enum.DetectionCoverage.Center;
-	DetectionMethod   = Zoner.Enum.DetectionMethod.Efficient;[]
+	DetectionMethod   = Zoner.Enum.DetectionMethod.Efficient;
 	DetectionMode     = Zoner.Enum.DetectionMode.Point;
 	
 	Simulation = Zoner.Enum.Simulation.PostSimulation;
@@ -97,13 +177,74 @@ local PlayerExited_Connection =
 		print(`{Player.Name} Exited Zone`)
 	end)
 
-```"><link data-rh="true" rel="canonical" href="https://skyriverstudios.dev/docs/Zoner/api/Zoner"><link data-rh="true" rel="alternate" href="https://skyriverstudios.dev/docs/Zoner/api/Zoner" hreflang="en"><link data-rh="true" rel="alternate" href="https://skyriverstudios.dev/docs/Zoner/api/Zoner" hreflang="x-default"><link rel="stylesheet" href="/docs/Zoner/assets/css/styles.83e81f68.css">
-<script src="/docs/Zoner/assets/js/runtime~main.a2ad7ccf.js" defer="defer"></script>
-<script src="/docs/Zoner/assets/js/main.0756658a.js" defer="defer"></script>
+```"><link data-rh="true" rel="canonical" href="https://skyriverstudios.dev/docs/Zoner/api/Zoner"><link data-rh="true" rel="alternate" href="https://skyriverstudios.dev/docs/Zoner/api/Zoner" hreflang="en"><link data-rh="true" rel="alternate" href="https://skyriverstudios.dev/docs/Zoner/api/Zoner" hreflang="x-default"><link rel="stylesheet" href="/docs/Zoner/assets/css/styles.5cbed574.css">
+<script src="/docs/Zoner/assets/js/runtime~main.9c5ca059.js" defer="defer"></script>
+<script src="/docs/Zoner/assets/js/main.bee5c627.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
-<script>!function(){function t(t){document.documentElement.setAttribute("data-theme",t)}var e=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();null!==e?t(e):window.matchMedia("(prefers-color-scheme: dark)").matches?t("dark"):(window.matchMedia("(prefers-color-scheme: light)").matches,t("light"))}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="navbar navbar--fixed-top"><div class="navbar__inner"><div class="navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/docs/Zoner/"><b class="navbar__title text--truncate">Zoner Documentation</b></a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/docs/Zoner/api/">API</a></div><div class="navbar__items navbar__items--right"><a href="https://github.com/skyriverstudios/Zoner" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">GitHub<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="Switch between dark and light mode (currently light mode)" aria-label="Switch between dark and light mode (currently light mode)" aria-live="polite" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" class="lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" class="darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"><div class="navbar__search"><span aria-label="expand searchbar" role="button" class="search-icon" tabindex="0"></span><input id="search_input_react" type="search" placeholder="Loading..." aria-label="Search" class="navbar__search-input search-bar" disabled=""></div></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="main-wrapper mainWrapper_z2l0 docPageContainer_wNNk"><div class="docPage_Dpn1"><div class="docSidebarContainer_o_re"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" href="/docs/Zoner/api/Zoner">​Zoner</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/docs/Zoner/api/Zone">​Zone</a></li></ul></nav></div></div><main class="docMainContainer_HJE1"><div class="container padding-vert--lg"><div class="row"><div class="col docItemCol_MU3C"><div class="docItemContainer_Wv98"><article><div class="member_J0w1 markdown"><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_oUs_"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><header><h1 class="docTitle_mZRt" style="text-decoration:none"><span style="display:inline-block">Zoner</span></h1><div class="luaClassTags_EipM"></div><div>
-<p>Zoner is a singleton which exports a table of functions to publicly interact with the private methods</p>
+<script>!function(){function t(t){document.documentElement.setAttribute("data-theme",t)}var e=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();null!==e?t(e):window.matchMedia("(prefers-color-scheme: dark)").matches?t("dark"):(window.matchMedia("(prefers-color-scheme: light)").matches,t("light"))}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="navbar navbar--fixed-top"><div class="navbar__inner"><div class="navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/docs/Zoner/"><b class="navbar__title text--truncate">Zoner Documentation</b></a><a class="navbar__item navbar__link" href="/docs/Zoner/docs/intro">Docs</a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/docs/Zoner/api/">API</a></div><div class="navbar__items navbar__items--right"><a href="https://github.com/skyriverstudios/Zoner" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">GitHub<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="Switch between dark and light mode (currently light mode)" aria-label="Switch between dark and light mode (currently light mode)" aria-live="polite" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" class="lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" class="darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"><div class="navbar__search"><span aria-label="expand searchbar" role="button" class="search-icon" tabindex="0"></span><input id="search_input_react" type="search" placeholder="Loading..." aria-label="Search" class="navbar__search-input search-bar" disabled=""></div></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="main-wrapper mainWrapper_z2l0 docPageContainer_wNNk"><div class="docPage_Dpn1"><div class="docSidebarContainer_o_re"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" href="/docs/Zoner/api/Zoner">Public</a></div><ul style="display:block;overflow:visible;height:auto" class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="/docs/Zoner/api/Zoner">​Zoner</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/docs/Zoner/api/Zone">​Zone</a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="false" href="/docs/Zoner/api/Groups">Internal</a></div></li></ul></nav></div></div><main class="docMainContainer_HJE1"><div class="container padding-vert--lg"><div class="row"><div class="col docItemCol_MU3C"><div class="docItemContainer_Wv98"><article><div class="member_J0w1 markdown"><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_oUs_"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><header><h1 class="docTitle_mZRt" style="text-decoration:none"><span style="display:inline-block">Zoner</span></h1><div class="luaClassTags_EipM"></div><div>
+<p>
+  <strong>Zoner</strong> is the high-performance zone manager for your experience — a <strong>per-run-context singleton</strong>
+  (one on Server, one on Client) that constructs zones, routes zone updates, and scales detection across
+  Actors for parallel execution.
+</p>
+<p><strong>What it is</strong></p>
+<ul>
+  <li>
+    A <strong>module-as-table facade</strong>: you require it once and call its exported factories
+    (<code>New</code>, <code>NewFromRegion</code>, <code>NewZoneFromBox</code>) instead of instantiating classes yourself.
+  </li>
+  <li>Internally, it owns a private <code>ZonerFolder</code> with:
+    <ul>
+      <li><code>Holders/</code> → a pool of <strong>ZonerActor</strong> (parallel) and <strong>ZonerGroup</strong> (serial) holders.</li>
+      <li><code>Groups/</code> → group containers whose attributes mirror group properties and zone IDs.</li>
+    </ul>
+  </li>
+  <li>A global <strong>Tracker Registry</strong> via <code>SharedTableRegistry</code> for lightweight, cross-script tracking.</li>
+</ul>
+<p><strong>How it works</strong></p>
+<ul>
+  <li>
+    Creating a zone picks a holder type from <code>ZoneConfig.Execution</code> (Parallel → Actor, Serial → Group),
+    provisions/loads holders as needed, and balances <strong>capacity</strong> automatically. Each holder’s <code>Ids</code>
+    attributes mirror live zone membership, while an internal cache maps identifiers → zone objects for O(1) access.
+  </li>
+  <li>Updates propagate through attribute changes and bindables (<code>Zone_Update</code>, <code>TrackerId_*</code>) without yielding.</li>
+</ul>
+<p><strong>Detection &#x26; Bounds</strong></p>
+<ul>
+  <li>Build zones from parts/models/folders <strong>or</strong> from <strong>partless boxes</strong> (<code>CFrame</code> + <code>Size</code>).</li>
+  <li>
+    Tunable <code>DetectionCoverage</code>, <code>DetectionMethod</code>, <code>DetectionMode</code>, <code>Simulation</code>, <code>Bounds</code>, and <code>Rate</code>
+    with smart defaults. When <code>DetectionMethod.Automatic</code>, Zoner selects an efficient strategy; complex
+    modes create internal parts only when required.
+  </li>
+</ul>
+<p><strong>VM / Actor model</strong></p>
+<ul>
+  <li>
+    Each <strong>ZonerActor</strong> runs the engine script for the current run context and processes a slice of zones
+    <strong>in parallel</strong>; capacities <strong>auto-scale</strong> with configured thread limits.
+  </li>
+  <li>
+    The <code>Groups/</code> container is designed to be <strong>registered in each VM</strong> (per Actor) so group attributes
+    and zone IDs stay <strong>automatically synchronized</strong> across Zoner Actor VMs, making group properties easy
+    to read anywhere they are required.
+  </li>
+</ul>
+<p><strong>Public surface</strong></p>
+<ul>
+  <li><code>New</code>, <code>NewFromRegion</code>, <code>NewZoneFromBox</code> — zone factories returning <code>Zone</code> objects.</li>
+  <li><code>CreateGroup</code> — registers a group; its properties and membership are exposed via attributes for all VMs.</li>
+  <li><code>RelocateZonerFolder</code> — safely re-parents the internal folder (server-side).</li>
+  <li><code>Enum</code> — public enums used by configs.</li>
+  <li><code>ZONER_COLLISION_GROUP</code> — collision group name used for internal ZoneParts.</li>
+</ul>
+<p><strong>Lifecycle</strong></p>
+<ul>
+  <li>Zoner is created at require-time; call the factory functions directly.</li>
+  <li>Zones can be destroyed individually; if this script is removed, Zoner cleans itself up.</li>
+</ul>
 <p>Example:</p>
 <pre class="language-lua"><code class="language-lua"><span class="token comment">--!strict</span>
 
@@ -118,7 +259,7 @@ local PlayerExited_Connection =
 <span class="token comment">-- Any of the following can be left blank, you dont even need to use one:</span>
 <span class="token keyword">local</span> ZoneConfig<span class="token punctuation">:</span> Zoner<span class="token punctuation">.</span>ZoneConfig <span class="token operator">=</span> <span class="token punctuation">{</span>
 	DetectionCoverage <span class="token operator">=</span> Zoner<span class="token punctuation">.</span>Enum<span class="token punctuation">.</span>DetectionCoverage<span class="token punctuation">.</span>Center<span class="token punctuation">;</span>
-	DetectionMethod   <span class="token operator">=</span> Zoner<span class="token punctuation">.</span>Enum<span class="token punctuation">.</span>DetectionMethod<span class="token punctuation">.</span>Efficient<span class="token punctuation">;</span><span class="token punctuation">[</span><span class="token punctuation">]</span>
+	DetectionMethod   <span class="token operator">=</span> Zoner<span class="token punctuation">.</span>Enum<span class="token punctuation">.</span>DetectionMethod<span class="token punctuation">.</span>Efficient<span class="token punctuation">;</span>
 	DetectionMode     <span class="token operator">=</span> Zoner<span class="token punctuation">.</span>Enum<span class="token punctuation">.</span>DetectionMode<span class="token punctuation">.</span>Point<span class="token punctuation">;</span>
 	
 	Simulation <span class="token operator">=</span> Zoner<span class="token punctuation">.</span>Enum<span class="token punctuation">.</span>Simulation<span class="token punctuation">.</span>PostSimulation<span class="token punctuation">;</span>
@@ -149,16 +290,16 @@ local PlayerExited_Connection =
 	<span class="token keyword">end</span><span class="token punctuation">)</span>
 
 </code></pre>
-</div></header><h2 class="anchor anchorWithStickyNavbar_LWe7" id="types">Types<a href="#types" class="hash-link" aria-label="Direct link to Types" title="Direct link to Types">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="ZoneConfig"><code style="text-decoration:none">ZoneConfig</code><a href="#ZoneConfig" class="hash-link" aria-label="Direct link to ZoneConfig" title="Direct link to ZoneConfig">​</a></h3><span class="docTag__6UZ" style="border-color:#2b8ab6;color:#2b8ab6">public_types</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L196"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code class="purple_ieR2">interface</code> <code>ZoneConfig<!-- --> <!-- -->{</code><div class="inset_uKQm"><div><code>DetectionCoverage<!-- -->: </code><code class="blue_P4bS">Enum.DetectionCoverage?</code></div><div><code>DetectionMethod<!-- -->: </code><code class="blue_P4bS">Enum.DetectionMethod?</code></div><div><code>DetectionMode<!-- -->: </code><code class="blue_P4bS">Enum.DetectionMode?</code></div><div><code>Simulation<!-- -->: </code><code class="blue_P4bS">Enum.Simulation?</code></div><div><code>Execution<!-- -->: </code><code class="blue_P4bS">Enum.Execution?</code></div><div><code>Bounds<!-- -->: </code><code class="blue_P4bS">Enum.Bounds?</code></div><div><code>Rate<!-- -->: </code><code class="blue_P4bS">Enum.Rate?</code></div><div><code>NoZonePartPropertyListening<!-- -->: </code><code class="blue_P4bS">boolean?</code></div><div><code>NoZonePartAddedListening<!-- -->: </code><code class="blue_P4bS">boolean?</code></div><div><code>ManualStepping<!-- -->: </code><code class="blue_P4bS">boolean?</code></div></div><code>}</code></div><div></div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="ZoneContainer"><code style="text-decoration:none">ZoneContainer</code><a href="#ZoneContainer" class="hash-link" aria-label="Direct link to ZoneContainer" title="Direct link to ZoneContainer">​</a></h3><span class="docTag__6UZ" style="border-color:#2b8ab6;color:#2b8ab6">public_types</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L205"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code class="purple_ieR2">type</code> <code>ZoneContainer<!-- --> = </code> <code class="purple_ieR2">(</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Model" target="_blank" rel="noopener noreferrer">Model<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="op_lSLc"> | </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Folder" target="_blank" rel="noopener noreferrer">Folder<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="op_lSLc"> | </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="op_lSLc"> | </code><code class="green_DgR4">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="green_DgR4">}</code><code class="op_lSLc"> | </code><code class="green_DgR4">{</code><span><code>[</code><code class="blue_P4bS">string</code><code>]</code></span><code>: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="green_DgR4">}</code><code class="op_lSLc"> | </code><code class="blue_P4bS">ZoneBoxes</code><code class="purple_ieR2">)</code></div><div>
+</div></header><h2 class="anchor anchorWithStickyNavbar_LWe7" id="types">Types<a href="#types" class="hash-link" aria-label="Direct link to Types" title="Direct link to Types">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="ZoneConfig"><code style="text-decoration:none">ZoneConfig</code><a href="#ZoneConfig" class="hash-link" aria-label="Direct link to ZoneConfig" title="Direct link to ZoneConfig">​</a></h3><span class="docTag__6UZ" style="border-color:#2b8ab6;color:#2b8ab6">public_types</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L243"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code class="purple_ieR2">interface</code> <code>ZoneConfig<!-- --> <!-- -->{</code><div class="inset_uKQm"><div><code>DetectionCoverage<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#DetectionCoverage">DetectionCoverage?</a></code></div><div><code>DetectionMethod<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#DetectionMethod">DetectionMethod?</a></code></div><div><code>DetectionMode<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#DetectionMode">DetectionMode?</a></code></div><div><code>Simulation<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#Simulation">Simulation?</a></code></div><div><code>Execution<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#Execution">Execution?</a></code></div><div><code>Bounds<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#Bounds">Bounds?</a></code></div><div><code>Rate<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#Rate">Rate?</a></code></div><div><code>ExitDetectionMode<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#DetectionMode">DetectionMode?</a></code></div><div><code>ExitDetectionCoverage<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#DetectionCoverage">DetectionCoverage?</a></code></div><div><code>EnterDetectionMode<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#DetectionMode">DetectionMode?</a></code></div><div><code>EnterDetectionCoverage<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Enums#DetectionCoverage">DetectionCoverage?</a></code></div><div><code>NoZonePartPropertyListening<!-- -->: </code><code class="blue_P4bS">boolean?</code></div><div><code>NoZonePartAddedListening<!-- -->: </code><code class="blue_P4bS">boolean?</code></div><div><code>ManualStepping<!-- -->: </code><code class="blue_P4bS">boolean?</code></div></div><code>}</code></div><div></div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="ZoneContainer"><code style="text-decoration:none">ZoneContainer</code><a href="#ZoneContainer" class="hash-link" aria-label="Direct link to ZoneContainer" title="Direct link to ZoneContainer">​</a></h3><span class="docTag__6UZ" style="border-color:#2b8ab6;color:#2b8ab6">public_types</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L252"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code class="purple_ieR2">type</code> <code>ZoneContainer<!-- --> = </code> <code class="purple_ieR2">(</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Model" target="_blank" rel="noopener noreferrer">Model<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="op_lSLc"> | </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Folder" target="_blank" rel="noopener noreferrer">Folder<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="op_lSLc"> | </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="op_lSLc"> | </code><code class="green_DgR4">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="green_DgR4">}</code><code class="op_lSLc"> | </code><code class="green_DgR4">{</code><span><code>[</code><code class="blue_P4bS">string</code><code>]</code></span><code>: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="green_DgR4">}</code><code class="op_lSLc"> | </code><code class="blue_P4bS">ZoneBoxes</code><code class="purple_ieR2">)</code></div><div>
 <p>A type of Zone "Part". Instanceless representation of a single Zone Box</p>
 </div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="ZoneBox"><code style="text-decoration:none">ZoneBox</code><a href="#ZoneBox" class="hash-link" aria-label="Direct link to ZoneBox" title="Direct link to ZoneBox">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">private_types</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/Types/init.luau#L21"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code class="purple_ieR2">type</code> <code>ZoneBox<!-- --> = </code> <code class="purple_ieR2">{</code><div class="inset_uKQm"><code>CFrame<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>Size<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code></div><code class="purple_ieR2">}</code></div><div>
 <p>A type of Zone "Part". Instanceless representation of a single Zone Box</p>
 </div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="ZoneBoxs"><code style="text-decoration:none">ZoneBoxs</code><a href="#ZoneBoxs" class="hash-link" aria-label="Direct link to ZoneBoxs" title="Direct link to ZoneBoxs">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">private_types</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/Types/init.luau#L30"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code class="purple_ieR2">type</code> <code>ZoneBoxs<!-- --> = </code> <code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Zoner#ZoneBox">ZoneBox</a></code><code class="purple_ieR2">}</code></div><div>
 <p>An array of ZoneBoxes. Useful to create multiple, instanceless Zone boxes as one container</p>
-</div><h2 class="anchor anchorWithStickyNavbar_LWe7" id="properties">Properties<a href="#properties" class="hash-link" aria-label="Direct link to Properties" title="Direct link to Properties">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="ZONER_COLLISION_GROUP"><code style="text-decoration:none">ZONER_COLLISION_GROUP</code><a href="#ZONER_COLLISION_GROUP" class="hash-link" aria-label="Direct link to ZONER_COLLISION_GROUP" title="Direct link to ZONER_COLLISION_GROUP">​</a></h3><span class="badge_Ba2I" style="color:#e74c3c"><span class="badgeTooltip_cWXP">This item is read only and cannot be modified.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" height="300px" width="300px" fill="#e74c3c" x="0px" y="0px" viewBox="0 0 96 96"><path d="M70.354,15.662h-7.496H25.566c-3.282,0-5.19-0.776-5.728-1.169v-1.456c0.538-0.393,2.445-1.168,5.728-1.168h46.479V8H25.566  c-4.776,0-9.594,1.468-9.594,4.747v61.458C15.972,86.645,20.328,88,37.495,88h42.535V15.662H70.354z"></path></svg> <!-- -->Read Only</span></span><span class="docTag__6UZ" style="border-color:#ff793f;color:#ff793f">collision_groups</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L120"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.<!-- -->ZONER_COLLISION_GROUP<!-- -->:<!-- --> </code> <code class="blue_P4bS">string</code></div><div>
+</div><h2 class="anchor anchorWithStickyNavbar_LWe7" id="properties">Properties<a href="#properties" class="hash-link" aria-label="Direct link to Properties" title="Direct link to Properties">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="ZONER_COLLISION_GROUP"><code style="text-decoration:none">ZONER_COLLISION_GROUP</code><a href="#ZONER_COLLISION_GROUP" class="hash-link" aria-label="Direct link to ZONER_COLLISION_GROUP" title="Direct link to ZONER_COLLISION_GROUP">​</a></h3><span class="badge_Ba2I" style="color:#e74c3c"><span class="badgeTooltip_cWXP">This item is read only and cannot be modified.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" height="300px" width="300px" fill="#e74c3c" x="0px" y="0px" viewBox="0 0 96 96"><path d="M70.354,15.662h-7.496H25.566c-3.282,0-5.19-0.776-5.728-1.169v-1.456c0.538-0.393,2.445-1.168,5.728-1.168h46.479V8H25.566  c-4.776,0-9.594,1.468-9.594,4.747v61.458C15.972,86.645,20.328,88,37.495,88h42.535V15.662H70.354z"></path></svg> <!-- -->Read Only</span></span><span class="docTag__6UZ" style="border-color:#ff793f;color:#ff793f">collision_groups</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L161"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.<!-- -->ZONER_COLLISION_GROUP<!-- -->:<!-- --> </code> <code class="blue_P4bS">string</code></div><div>
 <p>The collision group string used by Zoner internally for ZoneParts</p>
 <p>Accessed: <code>Zoner.ZONER_COLLISION_GROUP</code></p>
-</div><h2 class="anchor anchorWithStickyNavbar_LWe7" id="functions">Functions<a href="#functions" class="hash-link" aria-label="Direct link to Functions" title="Direct link to Functions">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="NewFromContainer"><code style="text-decoration:none">NewFromContainer</code><a href="#NewFromContainer" class="hash-link" aria-label="Direct link to NewFromContainer" title="Direct link to NewFromContainer">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1195"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">NewFromContainer</code><code>(</code><div class="inset_uKQm"><div><code>ZoneContainer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Zoner#ZoneContainer">ZoneContainer</a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
+</div><h2 class="anchor anchorWithStickyNavbar_LWe7" id="functions">Functions<a href="#functions" class="hash-link" aria-label="Direct link to Functions" title="Direct link to Functions">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="NewFromContainer"><code style="text-decoration:none">NewFromContainer</code><a href="#NewFromContainer" class="hash-link" aria-label="Direct link to NewFromContainer" title="Direct link to NewFromContainer">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1224"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">NewFromContainer</code><code>(</code><div class="inset_uKQm"><div><code>ZoneContainer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Zoner#ZoneContainer">ZoneContainer</a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
 <p>Boundaries of the zone.</p>
 </span></span></div><div><code>ZoneConfig<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Zoner#ZoneConfig">ZoneConfig?</a></code><span class="inlineDescription_G7Er">-- <span>
 <p>Optional zone tuning configs.</p>
@@ -166,7 +307,7 @@ local PlayerExited_Connection =
 <p>The constructed zone object.</p>
 </span></span></div><div>
 <p>Creates a new Zone from a part, model, folder, config, or a list of zone boxes.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="New"><code style="text-decoration:none">New</code><a href="#New" class="hash-link" aria-label="Direct link to New" title="Direct link to New">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1209"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">New</code><code>(</code><div class="inset_uKQm"><div><code>ZoneContainer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Zoner#ZoneContainer">ZoneContainer</a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="New"><code style="text-decoration:none">New</code><a href="#New" class="hash-link" aria-label="Direct link to New" title="Direct link to New">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1238"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">New</code><code>(</code><div class="inset_uKQm"><div><code>ZoneContainer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Zoner#ZoneContainer">ZoneContainer</a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
 <p>Boundaries of the zone.</p>
 </span></span></div><div><code>ZoneConfig<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Zoner#ZoneConfig">ZoneConfig?</a></code><span class="inlineDescription_G7Er">-- <span>
 <p>Optional zone tuning configs.</p>
@@ -174,7 +315,7 @@ local PlayerExited_Connection =
 <p>The constructed zone object.</p>
 </span></span></div><div>
 <p>Creates a new Zone from a part, model, folder, config, or a list of zone boxes.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="NewZoneFromRegion"><code style="text-decoration:none">NewZoneFromRegion</code><a href="#NewZoneFromRegion" class="hash-link" aria-label="Direct link to NewZoneFromRegion" title="Direct link to NewZoneFromRegion">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1225"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">NewZoneFromRegion</code><code>(</code><div class="inset_uKQm"><div><code>RegionCFrame<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="NewZoneFromRegion"><code style="text-decoration:none">NewZoneFromRegion</code><a href="#NewZoneFromRegion" class="hash-link" aria-label="Direct link to NewZoneFromRegion" title="Direct link to NewZoneFromRegion">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1254"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">NewZoneFromRegion</code><code>(</code><div class="inset_uKQm"><div><code>RegionCFrame<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
 <p>Position and rotation of the region.</p>
 </span></span></div><div><code>RegionSize<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
 <p>Dimensions of the region.</p>
@@ -184,7 +325,7 @@ local PlayerExited_Connection =
 <p>The constructed region zone.</p>
 </span></span></div><div>
 <p>Creates a new zone from a region defined by a CFrame and Size vector.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="NewZoneFromBox"><code style="text-decoration:none">NewZoneFromBox</code><a href="#NewZoneFromBox" class="hash-link" aria-label="Direct link to NewZoneFromBox" title="Direct link to NewZoneFromBox">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1241"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">NewZoneFromBox</code><code>(</code><div class="inset_uKQm"><div><code>BoxCFrame<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="NewZoneFromBox"><code style="text-decoration:none">NewZoneFromBox</code><a href="#NewZoneFromBox" class="hash-link" aria-label="Direct link to NewZoneFromBox" title="Direct link to NewZoneFromBox">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1270"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">NewZoneFromBox</code><code>(</code><div class="inset_uKQm"><div><code>BoxCFrame<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
 <p>Position and rotation of the region.</p>
 </span></span></div><div><code>BoxSize<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
 <p>Dimensions of the region.</p>
@@ -194,15 +335,15 @@ local PlayerExited_Connection =
 <p>The constructed region zone.</p>
 </span></span></div><div>
 <p>Creates a new zone from a box defined by a CFrame and Size vector.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="RelocateZonerFolder"><code style="text-decoration:none">RelocateZonerFolder</code><a href="#RelocateZonerFolder" class="hash-link" aria-label="Direct link to RelocateZonerFolder" title="Direct link to RelocateZonerFolder">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1253"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">RelocateZonerFolder</code><code>(</code><div class="inset_uKQm"><div><code>Location<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Instance" target="_blank" rel="noopener noreferrer">Instance?<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="RelocateZonerFolder"><code style="text-decoration:none">RelocateZonerFolder</code><a href="#RelocateZonerFolder" class="hash-link" aria-label="Direct link to RelocateZonerFolder" title="Direct link to RelocateZonerFolder">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1282"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">RelocateZonerFolder</code><code>(</code><div class="inset_uKQm"><div><code>Location<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Instance" target="_blank" rel="noopener noreferrer">Instance?<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><span class="inlineDescription_G7Er">-- <span>
 <p>the Location to send the Folder (usually a service)</p>
 </span></span></div></div><code>) → </code><code>(</code><code>)</code></div><div>
 <p>Relocates the Zoner Folder which stores the Zone Instances</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="CreateGroup"><code style="text-decoration:none">CreateGroup</code><a href="#CreateGroup" class="hash-link" aria-label="Direct link to CreateGroup" title="Direct link to CreateGroup">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1267"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">CreateGroup</code><code>(</code><div class="inset_uKQm"><div><code>self<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Zoner">Zoner</a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="CreateGroup"><code style="text-decoration:none">CreateGroup</code><a href="#CreateGroup" class="hash-link" aria-label="Direct link to CreateGroup" title="Direct link to CreateGroup">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/skyriverstudios/Zoner/blob/main/src/init.luau#L1296"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zoner<!-- -->.</code><code class="green_DgR4">CreateGroup</code><code>(</code><div class="inset_uKQm"><div><code>self<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Zoner">Zoner</a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
 <p>The current Zoner context.</p>
 </span></span></div><div><code>GroupName<!-- -->: </code><code class="blue_P4bS">string</code><code>,</code><span class="inlineDescription_G7Er">-- <span>
 <p>Name to store as.</p>
-</span></span></div><div><code>Properties<!-- -->: </code><code class="blue_P4bS">ZoneGroupProperties</code><span class="inlineDescription_G7Er">-- <span>
+</span></span></div><div><code>Properties<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/docs/Zoner/api/Groups#ZoneGroupProperties">ZoneGroupProperties</a></code><span class="inlineDescription_G7Er">-- <span>
 <p>Properties associated with this group</p>
 </span></span></div></div><code>) → </code><code>(</code><code>)</code></div><div>
 <p>Creates a new Zone Group to be bound to:</p>
@@ -231,7 +372,7 @@ local PlayerExited_Connection =
             ],
             &quot;function_type&quot;: &quot;static&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 1195,
+                &quot;line&quot;: 1224,
                 &quot;path&quot;: &quot;src/init.luau&quot;
             }
         },
@@ -258,7 +399,7 @@ local PlayerExited_Connection =
             ],
             &quot;function_type&quot;: &quot;static&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 1209,
+                &quot;line&quot;: 1238,
                 &quot;path&quot;: &quot;src/init.luau&quot;
             }
         },
@@ -290,7 +431,7 @@ local PlayerExited_Connection =
             ],
             &quot;function_type&quot;: &quot;static&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 1225,
+                &quot;line&quot;: 1254,
                 &quot;path&quot;: &quot;src/init.luau&quot;
             }
         },
@@ -322,7 +463,7 @@ local PlayerExited_Connection =
             ],
             &quot;function_type&quot;: &quot;static&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 1241,
+                &quot;line&quot;: 1270,
                 &quot;path&quot;: &quot;src/init.luau&quot;
             }
         },
@@ -339,7 +480,7 @@ local PlayerExited_Connection =
             &quot;returns&quot;: [],
             &quot;function_type&quot;: &quot;static&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 1253,
+                &quot;line&quot;: 1282,
                 &quot;path&quot;: &quot;src/init.luau&quot;
             }
         },
@@ -366,7 +507,7 @@ local PlayerExited_Connection =
             &quot;returns&quot;: [],
             &quot;function_type&quot;: &quot;static&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 1267,
+                &quot;line&quot;: 1296,
                 &quot;path&quot;: &quot;src/init.luau&quot;
             }
         }
@@ -381,7 +522,7 @@ local PlayerExited_Connection =
             ],
             &quot;readonly&quot;: true,
             &quot;source&quot;: {
-                &quot;line&quot;: 120,
+                &quot;line&quot;: 161,
                 &quot;path&quot;: &quot;src/init.luau&quot;
             }
         }
@@ -393,37 +534,57 @@ local PlayerExited_Connection =
             &quot;fields&quot;: [
                 {
                     &quot;name&quot;: &quot;DetectionCoverage&quot;,
-                    &quot;lua_type&quot;: &quot;Enum.DetectionCoverage?&quot;,
+                    &quot;lua_type&quot;: &quot;DetectionCoverage?&quot;,
                     &quot;desc&quot;: &quot;&quot;
                 },
                 {
                     &quot;name&quot;: &quot;DetectionMethod&quot;,
-                    &quot;lua_type&quot;: &quot;Enum.DetectionMethod?&quot;,
+                    &quot;lua_type&quot;: &quot;DetectionMethod?&quot;,
                     &quot;desc&quot;: &quot;&quot;
                 },
                 {
                     &quot;name&quot;: &quot;DetectionMode&quot;,
-                    &quot;lua_type&quot;: &quot;Enum.DetectionMode?&quot;,
+                    &quot;lua_type&quot;: &quot;DetectionMode?&quot;,
                     &quot;desc&quot;: &quot;&quot;
                 },
                 {
                     &quot;name&quot;: &quot;Simulation&quot;,
-                    &quot;lua_type&quot;: &quot;Enum.Simulation?&quot;,
+                    &quot;lua_type&quot;: &quot;Simulation?&quot;,
                     &quot;desc&quot;: &quot;&quot;
                 },
                 {
                     &quot;name&quot;: &quot;Execution&quot;,
-                    &quot;lua_type&quot;: &quot;Enum.Execution?&quot;,
+                    &quot;lua_type&quot;: &quot;Execution?&quot;,
                     &quot;desc&quot;: &quot;&quot;
                 },
                 {
                     &quot;name&quot;: &quot;Bounds&quot;,
-                    &quot;lua_type&quot;: &quot;Enum.Bounds?&quot;,
+                    &quot;lua_type&quot;: &quot;Bounds?&quot;,
                     &quot;desc&quot;: &quot;&quot;
                 },
                 {
                     &quot;name&quot;: &quot;Rate&quot;,
-                    &quot;lua_type&quot;: &quot;Enum.Rate?&quot;,
+                    &quot;lua_type&quot;: &quot;Rate?&quot;,
+                    &quot;desc&quot;: &quot;&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;ExitDetectionMode&quot;,
+                    &quot;lua_type&quot;: &quot;DetectionMode?&quot;,
+                    &quot;desc&quot;: &quot;&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;ExitDetectionCoverage&quot;,
+                    &quot;lua_type&quot;: &quot;DetectionCoverage?&quot;,
+                    &quot;desc&quot;: &quot;&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;EnterDetectionMode&quot;,
+                    &quot;lua_type&quot;: &quot;DetectionMode?&quot;,
+                    &quot;desc&quot;: &quot;&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;EnterDetectionCoverage&quot;,
+                    &quot;lua_type&quot;: &quot;DetectionCoverage?&quot;,
                     &quot;desc&quot;: &quot;&quot;
                 },
                 {
@@ -446,7 +607,7 @@ local PlayerExited_Connection =
                 &quot;public_types&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 196,
+                &quot;line&quot;: 243,
                 &quot;path&quot;: &quot;src/init.luau&quot;
             }
         },
@@ -458,7 +619,7 @@ local PlayerExited_Connection =
                 &quot;public_types&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 205,
+                &quot;line&quot;: 252,
                 &quot;path&quot;: &quot;src/init.luau&quot;
             }
         },
@@ -488,9 +649,9 @@ local PlayerExited_Connection =
         }
     ],
     &quot;name&quot;: &quot;Zoner&quot;,
-    &quot;desc&quot;: &quot;Zoner is a singleton which exports a table of functions to publicly interact with the private methods\n\nExample:\n```lua\n--!strict\n\n-- Require the Zoner Module:\nlocal Zoner = require(script.Parent.Vendor.Zoner)\n\n-- Reference a Part Box BasePart in Workspace to use as a Zone reference:\n-- (If enabled, Zoner will automatically update as the ZonePart moves or changes size)\nlocal ZoneBox: BasePart = workspace.Box\n\n-- Define a ZoneConfig table:\n-- Any of the following can be left blank, you dont even need to use one:\nlocal ZoneConfig: Zoner.ZoneConfig = {\n\tDetectionCoverage = Zoner.Enum.DetectionCoverage.Center;\n\tDetectionMethod   = Zoner.Enum.DetectionMethod.Efficient;[]\n\tDetectionMode     = Zoner.Enum.DetectionMode.Point;\n\t\n\tSimulation = Zoner.Enum.Simulation.PostSimulation;\n\tBounds     = Zoner.Enum.Bounds.BoxExact;\n\tExecution  = Zoner.Enum.Execution.Parallel;\n\tRate       = Zoner.Enum.Rate.Immediate;\n\n\tNoZonePartPropertyListening = false;\n\tNoZonePartAddedListening    = false;\n\tManualStepping              = false;\n}\n\n-- Create the Zone Object using the ZoneBox and ZoneConfig:\nlocal Zone_From_Part: Zoner.Zone = Zoner.New(ZoneBox, ZoneConfig)\n\n-- Connect to the PlayerEntered Signal:\n-- Returns connection so you can disconnect if youd like:\nlocal PlayerEntered_Connection = \n\tZone_From_Part.PlayerEntered:Connect(function(Player: Player) \n\t\tprint(`{Player.Name} Entered Zone`)\n\tend)\n\n-- Connect to the PlayerExited Signal:\n-- Returns connection so you can disconnect if youd like:\nlocal PlayerExited_Connection = \n\tZone_From_Part.PlayerExited:Connect(function(Player: Player) \n\t\tprint(`{Player.Name} Exited Zone`)\n\tend)\n\n```&quot;,
+    &quot;desc&quot;: &quot;**Zoner** is the high-performance zone manager for your experience — a **per-run-context singleton**\n(one on Server, one on Client) that constructs zones, routes zone updates, and scales detection across\nActors for parallel execution.\n\n**What it is**\n- A **module-as-table facade**: you require it once and call its exported factories\n  (`New`, `NewFromRegion`, `NewZoneFromBox`) instead of instantiating classes yourself.\n- Internally, it owns a private `ZonerFolder` with:\n  - `Holders/` → a pool of **ZonerActor** (parallel) and **ZonerGroup** (serial) holders.\n  - `Groups/`  → group containers whose attributes mirror group properties and zone IDs.\n- A global **Tracker Registry** via `SharedTableRegistry` for lightweight, cross-script tracking.\n\n**How it works**\n- Creating a zone picks a holder type from `ZoneConfig.Execution` (Parallel → Actor, Serial → Group),\n  provisions/loads holders as needed, and balances **capacity** automatically. Each holder’s `Ids`\n  attributes mirror live zone membership, while an internal cache maps identifiers → zone objects for O(1) access.\n- Updates propagate through attribute changes and bindables (`Zone_Update`, `TrackerId_*`) without yielding.\n\n**Detection &amp; Bounds**\n- Build zones from parts/models/folders **or** from **partless boxes** (`CFrame` + `Size`).\n- Tunable `DetectionCoverage`, `DetectionMethod`, `DetectionMode`, `Simulation`, `Bounds`, and `Rate`\n  with smart defaults. When `DetectionMethod.Automatic`, Zoner selects an efficient strategy; complex\n  modes create internal parts only when required.\n\n**VM / Actor model**\n- Each **ZonerActor** runs the engine script for the current run context and processes a slice of zones\n  **in parallel**; capacities **auto-scale** with configured thread limits.\n- The `Groups/` container is designed to be **registered in each VM** (per Actor) so group attributes\n  and zone IDs stay **automatically synchronized** across Zoner Actor VMs, making group properties easy\n  to read anywhere they are required.\n\n**Public surface**\n- `New`, `NewFromRegion`, `NewZoneFromBox` — zone factories returning `Zone` objects.\n- `CreateGroup` — registers a group; its properties and membership are exposed via attributes for all VMs.\n- `RelocateZonerFolder` — safely re-parents the internal folder (server-side).\n- `Enum` — public enums used by configs.\n- `ZONER_COLLISION_GROUP` — collision group name used for internal ZoneParts.\n\n**Lifecycle**\n- Zoner is created at require-time; call the factory functions directly.\n- Zones can be destroyed individually; if this script is removed, Zoner cleans itself up.\n\nExample:\n```lua\n--!strict\n\n-- Require the Zoner Module:\nlocal Zoner = require(script.Parent.Vendor.Zoner)\n\n-- Reference a Part Box BasePart in Workspace to use as a Zone reference:\n-- (If enabled, Zoner will automatically update as the ZonePart moves or changes size)\nlocal ZoneBox: BasePart = workspace.Box\n\n-- Define a ZoneConfig table:\n-- Any of the following can be left blank, you dont even need to use one:\nlocal ZoneConfig: Zoner.ZoneConfig = {\n\tDetectionCoverage = Zoner.Enum.DetectionCoverage.Center;\n\tDetectionMethod   = Zoner.Enum.DetectionMethod.Efficient;\n\tDetectionMode     = Zoner.Enum.DetectionMode.Point;\n\t\n\tSimulation = Zoner.Enum.Simulation.PostSimulation;\n\tBounds     = Zoner.Enum.Bounds.BoxExact;\n\tExecution  = Zoner.Enum.Execution.Parallel;\n\tRate       = Zoner.Enum.Rate.Immediate;\n\n\tNoZonePartPropertyListening = false;\n\tNoZonePartAddedListening    = false;\n\tManualStepping              = false;\n}\n\n-- Create the Zone Object using the ZoneBox and ZoneConfig:\nlocal Zone_From_Part: Zoner.Zone = Zoner.New(ZoneBox, ZoneConfig)\n\n-- Connect to the PlayerEntered Signal:\n-- Returns connection so you can disconnect if youd like:\nlocal PlayerEntered_Connection = \n\tZone_From_Part.PlayerEntered:Connect(function(Player: Player) \n\t\tprint(`{Player.Name} Entered Zone`)\n\tend)\n\n-- Connect to the PlayerExited Signal:\n-- Returns connection so you can disconnect if youd like:\nlocal PlayerExited_Connection = \n\tZone_From_Part.PlayerExited:Connect(function(Player: Player) \n\t\tprint(`{Player.Name} Exited Zone`)\n\tend)\n\n```&quot;,
     &quot;source&quot;: {
-        &quot;line&quot;: 86,
+        &quot;line&quot;: 126,
         &quot;path&quot;: &quot;src/init.luau&quot;
     }
 }</pre></details></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#types" class="table-of-contents__link toc-highlight">Types</a><ul><li><a href="#ZoneBox" class="table-of-contents__link toc-highlight">ZoneBox</a></li><li><a href="#ZoneBoxs" class="table-of-contents__link toc-highlight">ZoneBoxs</a></li><li><a href="#ZoneConfig" class="table-of-contents__link toc-highlight">ZoneConfig</a></li><li><a href="#ZoneContainer" class="table-of-contents__link toc-highlight">ZoneContainer</a></li></ul></li><li><a href="#properties" class="table-of-contents__link toc-highlight">Properties</a><ul><li><a href="#ZONER_COLLISION_GROUP" class="table-of-contents__link toc-highlight">ZONER_COLLISION_GROUP</a></li></ul></li><li><a href="#functions" class="table-of-contents__link toc-highlight">Functions</a><ul><li><a href="#CreateGroup" class="table-of-contents__link toc-highlight">.CreateGroup</a></li><li><a href="#New" class="table-of-contents__link toc-highlight">.New</a></li><li><a href="#NewFromContainer" class="table-of-contents__link toc-highlight">.NewFromContainer</a></li><li><a href="#NewZoneFromBox" class="table-of-contents__link toc-highlight">.NewZoneFromBox</a></li><li><a href="#NewZoneFromRegion" class="table-of-contents__link toc-highlight">.NewZoneFromRegion</a></li><li><a href="#RelocateZonerFolder" class="table-of-contents__link toc-highlight">.RelocateZonerFolder</a></li></ul></li></ul></div></div></div></div></main></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2025 skyriverstudios. Built with Moonwave and Docusaurus.</div></div></div></footer></div>
